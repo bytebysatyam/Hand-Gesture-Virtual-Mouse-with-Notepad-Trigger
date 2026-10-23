@@ -1,115 +1,170 @@
+import platform
+import subprocess
+import time
+
 import cv2
 import mediapipe as mp
 import numpy as np
 import pyautogui
-import subprocess
-import time
+
+from gesture_logic import classify_gesture
 
 SMOOTHENING = 5
-CLICK_DELAY = 1
+CLICK_DELAY = 0.75
+SCROLL_DELAY = 0.20
 FRAME_REDUCTION = 100
+SCROLL_AMOUNT = 5
 
-
-mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(min_detection_confidence=0.7,
-                       min_tracking_confidence=0.7)
-mp_draw = mp.solutions.drawing_utils
-
+pyautogui.FAILSAFE = True
 screen_w, screen_h = pyautogui.size()
 
-cap = cv2.VideoCapture(0)
-
-prev_x, prev_y = 0, 0
-last_click_time = 0
-app_opened = False
+mp_hands = mp.solutions.hands
+mp_draw = mp.solutions.drawing_utils
 
 
-def get_screen_coordinates(x, y, w, h):
-    screen_x = np.interp(x, (FRAME_REDUCTION, w - FRAME_REDUCTION), (0, screen_w))
-    screen_y = np.interp(y, (FRAME_REDUCTION, h - FRAME_REDUCTION), (0, screen_h))
-    return screen_x, screen_y
+def get_screen_coordinates(x: int, y: int, w: int, h: int) -> tuple[float, float]:
+    x_min = min(FRAME_REDUCTION, max(0, w // 3))
+    y_min = min(FRAME_REDUCTION, max(0, h // 3))
+    x_max = max(x_min + 1, w - x_min)
+    y_max = max(y_min + 1, h - y_min)
+
+    clipped_x = min(max(x, x_min), x_max)
+    clipped_y = min(max(y, y_min), y_max)
+
+    screen_x = np.interp(clipped_x, (x_min, x_max), (0, screen_w))
+    screen_y = np.interp(clipped_y, (y_min, y_max), (0, screen_h))
+    return float(screen_x), float(screen_y)
 
 
-def smooth_movement(curr_x, curr_y, prev_x, prev_y):
+def smooth_movement(curr_x: float, curr_y: float, prev_x: float, prev_y: float) -> tuple[float, float]:
     new_x = prev_x + (curr_x - prev_x) / SMOOTHENING
     new_y = prev_y + (curr_y - prev_y) / SMOOTHENING
     return new_x, new_y
 
 
-def is_close(x1, y1, x2, y2, threshold=20):
-    return abs(x1 - x2) < threshold and abs(y1 - y2) < threshold
+def open_notepad_once() -> None:
+    if platform.system() != "Windows":
+        print("Notepad trigger skipped: this feature is Windows-only.")
+        return
+
+    subprocess.Popen(["notepad.exe"])
+    time.sleep(0.7)
+    pyautogui.write("Gesture Controlled Notepad Opened!", interval=0.04)
 
 
+def main() -> None:
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        raise RuntimeError(
+            "Could not open webcam. Check camera permissions, close other camera apps, and try again."
+        )
 
-while cap.isOpened():
-    success, frame = cap.read()
-    if not success:
-        break
+    prev_x, prev_y = screen_w / 2, screen_h / 2
+    last_click_time = 0.0
+    last_scroll_time = 0.0
+    app_opened = False
 
-    frame = cv2.flip(frame, 1)
-    h, w, _ = frame.shape
+    try:
+        with mp_hands.Hands(
+            max_num_hands=1,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.7,
+        ) as hands:
+            while True:
+                success, frame = cap.read()
+                if not success:
+                    print("Webcam frame could not be read. Exiting.")
+                    break
 
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    result = hands.process(rgb_frame)
+                frame = cv2.flip(frame, 1)
+                h, w, _ = frame.shape
 
-    if result.multi_hand_landmarks:
-        for hand_landmarks in result.multi_hand_landmarks:
-            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                result = hands.process(rgb_frame)
 
-            # Landmarks
-            lm = hand_landmarks.landmark
+                action = "none"
 
-            index = lm[8]
-            thumb = lm[4]
-            middle = lm[12]
+                if result.multi_hand_landmarks:
+                    hand_landmarks = result.multi_hand_landmarks[0]
+                    mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                    lm = hand_landmarks.landmark
 
-            ix, iy = int(index.x * w), int(index.y * h)
-            tx, ty = int(thumb.x * w), int(thumb.y * h)
-            mx, my = int(middle.x * w), int(middle.y * h)
+                    thumb = (lm[4].x, lm[4].y)
+                    index_tip = (lm[8].x, lm[8].y)
+                    index_pip = (lm[6].x, lm[6].y)
+                    middle_tip = (lm[12].x, lm[12].y)
+                    middle_pip = (lm[10].x, lm[10].y)
+                    wrist = (lm[0].x, lm[0].y)
+                    middle_mcp = (lm[9].x, lm[9].y)
 
-            # Cursor Movement
-            screen_x, screen_y = get_screen_coordinates(ix, iy, w, h)
-            curr_x, curr_y = smooth_movement(screen_x, screen_y, prev_x, prev_y)
+                    action = classify_gesture(
+                        thumb=thumb,
+                        index_tip=index_tip,
+                        index_pip=index_pip,
+                        middle_tip=middle_tip,
+                        middle_pip=middle_pip,
+                        wrist=wrist,
+                        middle_mcp=middle_mcp,
+                    )
 
-            pyautogui.moveTo(curr_x, curr_y)
-            prev_x, prev_y = curr_x, curr_y
+                    current_time = time.time()
 
-            current_time = time.time()
+                    if action == "move":
+                        ix, iy = int(index_tip[0] * w), int(index_tip[1] * h)
+                        screen_x, screen_y = get_screen_coordinates(ix, iy, w, h)
+                        curr_x, curr_y = smooth_movement(screen_x, screen_y, prev_x, prev_y)
+                        pyautogui.moveTo(curr_x, curr_y, duration=0)
+                        prev_x, prev_y = curr_x, curr_y
 
-            # LEFT CLICK (Thumb + Index)
-            if is_close(tx, ty, ix, iy):
-                if current_time - last_click_time > CLICK_DELAY:
-                    pyautogui.click()
-                    last_click_time = current_time
-                    print("Left Click")
+                    elif action == "left_click" and current_time - last_click_time >= CLICK_DELAY:
+                        pyautogui.click()
+                        last_click_time = current_time
 
-            # RIGHT CLICK (Thumb + Middle)
-            elif is_close(tx, ty, mx, my):
-                if current_time - last_click_time > CLICK_DELAY:
-                    pyautogui.rightClick()
-                    last_click_time = current_time
-                    print("Right Click")
+                    elif action == "right_click" and current_time - last_click_time >= CLICK_DELAY:
+                        pyautogui.rightClick()
+                        last_click_time = current_time
 
-                    # Open Notepad once
-                    if not app_opened:
-                        subprocess.Popen(['notepad.exe'])
-                        time.sleep(1)
-                        pyautogui.write("Gesture Controlled Notepad Opened!", interval=0.05)
-                        app_opened = True
+                        if not app_opened:
+                            open_notepad_once()
+                            app_opened = True
 
-            # SCROLL (Index up/down relative to middle)
-            elif iy < my:
-                pyautogui.scroll(20)
-                print("Scroll Up")
+                    elif action == "scroll_up" and current_time - last_scroll_time >= SCROLL_DELAY:
+                        pyautogui.scroll(SCROLL_AMOUNT)
+                        last_scroll_time = current_time
 
-            elif iy > my:
-                pyautogui.scroll(-20)
-                print("Scroll Down")
+                    elif action == "scroll_down" and current_time - last_scroll_time >= SCROLL_DELAY:
+                        pyautogui.scroll(-SCROLL_AMOUNT)
+                        last_scroll_time = current_time
 
-    cv2.imshow("Virtual Mouse", frame)
+                cv2.putText(
+                    frame,
+                    f"Action: {action}",
+                    (20, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.8,
+                    (0, 255, 0),
+                    2,
+                    cv2.LINE_AA,
+                )
+                cv2.putText(
+                    frame,
+                    "ESC to exit | Move: index only | Click: thumb+index | Right: thumb+middle",
+                    (20, max(60, h - 20)),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.5,
+                    (255, 255, 255),
+                    1,
+                    cv2.LINE_AA,
+                )
 
-    if cv2.waitKey(1) & 0xFF == 27:
-        break
+                cv2.imshow("Virtual Mouse", frame)
+                if cv2.waitKey(1) & 0xFF == 27:
+                    break
 
-cap.release()
-cv2.destroyAllWindows()
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
