@@ -1,0 +1,42 @@
+name: Build Windows App
+
+on:
+  push:
+    branches: ["main", "feat/**"]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install runtime dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.16.0
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --name HandGestureVirtualMouse handgestures.py
+
+      - name: Verify executable exists
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/HandGestureVirtualMouse.exe")) { throw "Executable was not created." }
+          Get-Item "dist/HandGestureVirtualMouse.exe"
+
+      - name: Upload Windows executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: HandGestureVirtualMouse-Windows
+          path: dist/HandGestureVirtualMouse.exe
+          if-no-files-found: error
