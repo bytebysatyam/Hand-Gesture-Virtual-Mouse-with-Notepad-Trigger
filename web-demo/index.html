@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hand Gesture Virtual Mouse — Live Web Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Computer Vision • MediaPipe • Gesture UX</p>
+        <h1>Hand Gesture Virtual Mouse</h1>
+        <p class="lede">
+          Browser-safe live demo of the desktop project. Your webcam stays in the browser.
+          Gestures control the virtual cursor inside this demo area.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button id="startBtn" class="primary">Start Camera</button>
+        <button id="stopBtn" class="secondary" disabled>Stop</button>
+      </div>
+    </header>
+
+    <section class="status-grid">
+      <article class="stat">
+        <span>Status</span>
+        <strong id="statusText">Ready</strong>
+      </article>
+      <article class="stat">
+        <span>Detected action</span>
+        <strong id="actionText">none</strong>
+      </article>
+      <article class="stat">
+        <span>FPS</span>
+        <strong id="fpsText">0</strong>
+      </article>
+    </section>
+
+    <section class="demo-grid">
+      <div class="camera-card">
+        <div class="card-head">
+          <h2>Live hand tracking</h2>
+          <span class="badge">Webcam</span>
+        </div>
+        <div class="camera-stage">
+          <video id="inputVideo" playsinline></video>
+          <canvas id="outputCanvas"></canvas>
+        </div>
+      </div>
+
+      <div class="sandbox-card" id="sandbox">
+        <div class="card-head">
+          <h2>Gesture playground</h2>
+          <span class="badge">Virtual cursor only</span>
+        </div>
+
+        <div id="virtualCursor" class="virtual-cursor" aria-hidden="true"></div>
+
+        <div class="gesture-help">
+          <span><b>Move</b> index finger only</span>
+          <span><b>Left click</b> thumb + index pinch</span>
+          <span><b>Right click</b> thumb + middle pinch</span>
+          <span><b>Scroll</b> two-finger vertical separation</span>
+        </div>
+
+        <div class="test-zone">
+          <button class="test-button" data-demo-action="Primary target clicked">Primary target</button>
+          <button class="test-button alt" data-demo-action="Secondary target clicked">Secondary target</button>
+          <div class="click-result" id="clickResult">Move the virtual cursor onto a target and pinch to click.</div>
+        </div>
+
+        <div class="scroll-panel" id="scrollPanel">
+          <h3>Scroll test</h3>
+          <p>Use the two-finger scroll gesture while your hand is visible.</p>
+          <p>Computer vision maps your hand landmarks to browser-only interactions.</p>
+          <p>The original Windows desktop build controls the real OS cursor with PyAutoGUI.</p>
+          <p>This web demo intentionally stays inside the browser security sandbox.</p>
+          <p>MediaPipe Hands tracks 21 landmarks in real time.</p>
+          <p>Gesture classification uses normalized hand proportions.</p>
+          <p>Click actions are debounced to reduce accidental repeats.</p>
+          <p>Scroll actions are rate-limited for smoother interaction.</p>
+          <p>End of scroll test.</p>
+        </div>
+
+        <div id="contextMenu" class="context-menu" hidden>
+          <strong>Simulated right-click</strong>
+          <span>Desktop version also opens Windows Notepad on first right-click.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="notes">
+      <h2>What this demo proves</h2>
+      <p>
+        Webcam capture, MediaPipe hand tracking, landmark visualization, gesture classification,
+        virtual cursor movement, click simulation, and scroll simulation run live in-browser.
+        Operating-system mouse control and Notepad launch remain in the downloadable Windows desktop build.
+      </p>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>
