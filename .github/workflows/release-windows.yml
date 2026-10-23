@@ -1,0 +1,61 @@
+name: Publish Windows Release
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/release-windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller==6.16.0
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --onefile --name HandGestureVirtualMouse handgestures.py
+
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          if (!(Test-Path "dist/HandGestureVirtualMouse.exe")) {
+            throw "HandGestureVirtualMouse.exe was not created."
+          }
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.0
+          name: Hand Gesture Virtual Mouse v1.0.0
+          body: |
+            First public Windows release of the Hand Gesture Virtual Mouse project.
+
+            Features:
+            - Real webcam hand tracking
+            - Real Windows cursor movement
+            - Left click and right click gestures
+            - Gesture-based scrolling
+            - Windows Notepad trigger
+            - No Python installation required for end users
+
+            Note: This executable is unsigned, so Windows SmartScreen may show a warning on first launch.
+          files: dist/HandGestureVirtualMouse.exe
+          make_latest: true
