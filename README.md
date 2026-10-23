@@ -53,12 +53,14 @@ A smoothing factor is applied before calling `pyautogui.moveTo()` so cursor move
 
 | Gesture | Action |
 | --- | --- |
-| Move index finger | Move cursor |
-| Thumb close to index finger | Left click |
-| Thumb close to middle finger | Right click |
-| Index above middle finger | Scroll up |
-| Index below middle finger | Scroll down |
+| Index finger extended, middle finger folded | Move cursor |
+| Thumb + index pinch | Left click |
+| Thumb + middle pinch | Right click |
+| Two-finger vertical separation upward | Scroll up |
+| Two-finger vertical separation downward | Scroll down |
 | First detected right-click gesture | Open Notepad and type a message |
+
+Gesture detection now uses normalized hand proportions instead of a fixed pixel-only threshold, which makes the behavior more consistent across different camera resolutions.
 
 A short click delay is used to reduce repeated click events from a single gesture.
 
@@ -89,9 +91,17 @@ cd Hand-Gesture-Virtual-Mouse-with-Notepad-Trigger
 
 ### Install dependencies
 
+Python 3.11 is recommended for the pinned MediaPipe/OpenCV stack.
+
 ```bash
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+
 pip install -r requirements.txt
 ```
+
+The repository pins the dependency versions used by the project, including MediaPipe 0.10.9 and NumPy 1.23.5, to avoid breaking changes in newer releases.
 
 ### Run
 
@@ -116,10 +126,10 @@ These constants are defined near the top of `handgestures.py` and can be tuned f
 ## Current Limitations
 
 - The Notepad trigger is Windows-specific.
-- Gesture recognition uses simple coordinate thresholds rather than a trained gesture classifier.
-- Lighting and webcam quality can affect landmark detection.
-- Scroll gestures may be sensitive because they are determined using the relative vertical position of the index and middle fingers.
-- Cursor behavior may require tuning for different screen resolutions.
+- Gesture recognition is rule-based rather than a trained gesture classifier.
+- Lighting, hand angle, and webcam quality can still affect landmark detection.
+- Cursor behavior may require minor tuning for different users and screen sizes.
+- Actual mouse control requires a desktop session and webcam, so CI validates the gesture-classification logic rather than physical cursor movement.
 
 ## Possible Improvements
 
@@ -139,3 +149,14 @@ These constants are defined near the top of `handgestures.py` and can be tuned f
 - LinkedIn: https://www.linkedin.com/in/satyamshukla10/
 - Portfolio: https://satyam-shukla-portfolio-jet.vercel.app/
 - Email: shuklasatyam48890@gmail.com
+
+
+## Automated Verification
+
+GitHub Actions currently verifies:
+
+- Python syntax/compilation
+- Gesture classification helper tests
+- Click/move/scroll decision logic
+
+The physical webcam, Windows mouse control, and Notepad interaction still require a real Windows desktop with a webcam for final hardware-level validation.
